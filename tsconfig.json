@@ -1,0 +1,12 @@
+{
+  // Change this to match your project
+  "include": ["build/another-webgpu-kits.cjs", "three"],
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "allowJs": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outFile": "build/types/index.d.ts",
+    "declarationMap": false
+  }
+}

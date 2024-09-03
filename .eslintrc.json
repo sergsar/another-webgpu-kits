@@ -1,0 +1,29 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2018": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2018,
+    "sourceType": "module"
+  },
+  "extends": ["plugin:compat/recommended", "plugin:prettier/recommended"],
+  "plugins": ["html", "import"],
+  "settings": {
+    "polyfills": []
+  },
+  "globals": {},
+  "rules": {
+    "prettier/prettier": ["warn"],
+    "no-throw-literal": ["error"],
+    "prefer-const": [
+      "error",
+      {
+        "destructuring": "any",
+        "ignoreReadBeforeAssign": false
+      }
+    ]
+  }
+}
