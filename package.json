@@ -62,11 +62,11 @@
     "magic-string": "^0.30.10",
     "prettier": "^3.2.5",
     "rollup": "^4.17.2",
-    "three": "^0.167.1",
     "typescript": "^5.5.2"
   },
   "dependencies": {
     "another-webgpu": "^0.1.0-alpha.8"
+    "three": "^0.167.1"
   },
   "peerDependencies": {
     "another-webgpu": ">=0.1.0-alpha.8"
