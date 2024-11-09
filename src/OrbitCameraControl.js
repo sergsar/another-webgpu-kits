@@ -14,18 +14,26 @@ class OrbitCameraControl {
 	constructor({
 		camera = new Camera(),
 		element = document.createElement(''),
-		distance = 7,
+		distance = 9,
+		distanceMax = 20,
+		distanceMin = 3,
 		theta = 0, // around y axis
-		phi = 45, // around x axis
+		phi = 60, // around x axis
+		phiMax = 180,
+		phiMin = 0,
 	}) {
 		Object.defineProperties(this, {
 			camera: {value: camera},
 			element: {value: element},
 			thetaStart: {value: UnitUtils.degToRad(theta), writable: true},
 			phiStart: {value: UnitUtils.degToRad(phi), writable: true},
+			phiMin: {value: UnitUtils.degToRad(phiMin), writable: true},
+			phiMax: {value: UnitUtils.degToRad(phiMax), writable: true},
 			theta: {value: 0, writable: true},
 			phi: {value: 0, writable: true},
 			distance: {value: distance, writable: true},
+			distanceMax: {value: distanceMax, writable: true},
+			distanceMin: {value: distanceMin, writable: true},
 			clientStart: {value: new Vector2()},
 			client: {value: new Vector2()},
 			travel: {value: new Vector2()},
@@ -59,7 +67,9 @@ class OrbitCameraControl {
 			},
 		});
 
-		this.maxDepth = 0.91;
+		camera.useDepth = true;
+
+		this.maxDepth = 0.92;
 
 		element.addEventListener('contextmenu', this.onContextMenu);
 
@@ -99,13 +109,15 @@ class OrbitCameraControl {
 	onPointerMove = (e = new PointerEvent(null)) => {
 		this.client.set(e.clientX, e.clientY);
 		this.client.subtract(this.clientStart, this.travel);
+
 		if (this.button === 0) {
 			this.theta = this.thetaStart - this.travel.x * 0.1;
+			const phiSave = this.phi;
 			this.phi = this.phiStart - this.travel.y * 0.1;
-			// if (this.phi <= 0.01 || this.phi >= Math.PI * 0.4) {
-			// 	this.client.add(this.clientStart, this.travel)
-			// 	this.phi = this.phiStart - this.travel.y * 0.1
-			// }
+			if (this.phi <= this.phiMin || this.phi >= this.phiMax) {
+				this.phiStart -= this.phi - phiSave;
+				this.phi = phiSave;
+			}
 		}
 		if (this.button === 2) {
 			this.cameraRay.origin.copy(this.cameraStart);
@@ -124,7 +136,10 @@ class OrbitCameraControl {
 
 	onMouseWheel = (e = new WheelEvent(null)) => {
 		e.preventDefault();
-		this.distance += e.deltaY * 0.1;
+		this.distance = Math.max(
+			Math.min(this.distance + e.deltaY * 0.1, this.distanceMax),
+			this.distanceMin,
+		);
 		this.applyTransformations();
 	};
 
