@@ -22,7 +22,7 @@ function header() {
 	};
 }
 
-const external = ['another-webgpu', 'three'];
+const external = ['another-webgpu', 'three', 'three/examples/jsm/loaders/FBXLoader.js'];
 
 const resolve = nodeResolve();
 
