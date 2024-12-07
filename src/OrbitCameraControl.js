@@ -1,4 +1,14 @@
-import {Camera, Vector3, Vector2, Quaternion, UnitUtils} from 'another-webgpu';
+import {
+	Camera,
+	Vector3,
+	Vector2,
+	Quaternion,
+	UnitUtils,
+	Plane,
+	Ray,
+} from 'another-webgpu';
+import {DepthHelper} from './DepthHelper.js';
+import {Projector} from './Projector.js';
 
 class OrbitCameraControl {
 	constructor({
@@ -22,6 +32,16 @@ class OrbitCameraControl {
 			quaternion: {value: new Quaternion()},
 			zoomVector: {value: new Vector3(0, 1, 0)},
 			button: {value: -1, writable: true},
+			cameraStart: {value: new Vector3().copy(camera.position)},
+			cameraTargetStart: {value: new Vector3().copy(camera.target)},
+			cameraRay: {value: new Ray()},
+			cameraTravel: {value: new Vector3()},
+			depthSnapshot: {value: 0, writable: true},
+			intersectPlane: {value: new Plane(new Vector3(0, 1, 0))},
+			intersectStart: {value: new Vector3()},
+			intersect: {value: new Vector3()},
+			projector: {value: new Projector(camera, element)},
+			depthHelper: {value: new DepthHelper(camera, element)},
 			applyTransformations: {
 				value: () => {
 					this.quaternion.set(0, 0, 0, 1);
@@ -30,10 +50,16 @@ class OrbitCameraControl {
 					this.zoomVector.set(0, 1, 0);
 					this.zoomVector.applyQuaternion(this.quaternion);
 					this.zoomVector.length = this.distance;
+
+					this.cameraStart.add(this.cameraTravel, this.camera.position);
+					this.cameraTargetStart.add(this.cameraTravel, this.camera.target);
+
 					this.camera.target.add(this.zoomVector, this.camera.position);
 				},
 			},
 		});
+
+		this.maxDepth = 0.91;
 
 		element.addEventListener('contextmenu', this.onContextMenu);
 
@@ -52,6 +78,22 @@ class OrbitCameraControl {
 		this.element.addEventListener('pointermove', this.onPointerMove);
 		this.element.addEventListener('pointerup', this.onPointerUp);
 		this.element.addEventListener('wheel', this.onMouseWheel);
+
+		this.cameraStart.copy(this.camera.position);
+		this.cameraTargetStart.copy(this.camera.target);
+		this.depthSnapshot = Math.min(
+			this.depthHelper.getDepth(e.clientX, e.clientY),
+			this.maxDepth,
+		);
+
+		this.projector.updateView();
+		this.projector.applyIntersect(
+			e.clientX,
+			e.clientY,
+			this.depthSnapshot,
+			this.intersectStart,
+		);
+		this.intersectPlane.distance = this.intersectStart.y;
 	};
 
 	onPointerMove = (e = new PointerEvent(null)) => {
@@ -60,6 +102,22 @@ class OrbitCameraControl {
 		if (this.button === 0) {
 			this.theta = this.thetaStart - this.travel.x * 0.1;
 			this.phi = this.phiStart - this.travel.y * 0.1;
+			// if (this.phi <= 0.01 || this.phi >= Math.PI * 0.4) {
+			// 	this.client.add(this.clientStart, this.travel)
+			// 	this.phi = this.phiStart - this.travel.y * 0.1
+			// }
+		}
+		if (this.button === 2) {
+			this.cameraRay.origin.copy(this.cameraStart);
+			this.projector.applyIntersect(e.clientX, e.clientY, 0, this.intersect);
+			this.intersect
+				.subtract(this.cameraStart, this.cameraRay.direction)
+				.normalize();
+			this.cameraRay.intersectPlane(this.intersectPlane, this.intersect);
+
+			this.intersect
+				.subtract(this.intersectStart, this.cameraTravel)
+				.multiplyScalar(-1);
 		}
 		this.applyTransformations();
 	};
@@ -76,6 +134,10 @@ class OrbitCameraControl {
 
 		this.thetaStart = this.theta;
 		this.phiStart = this.phi;
+
+		this.cameraStart.copy(this.camera.position);
+		this.cameraTargetStart.copy(this.camera.target);
+		this.cameraTravel.set(0, 0, 0);
 	};
 
 	onContextMenu = (e = new Event(null)) => {
