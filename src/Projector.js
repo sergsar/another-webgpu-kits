@@ -4,36 +4,44 @@ import {Camera, Vector2, Vector4, Matrix4, Vector3} from 'another-webgpu';
 
 class Projector {
 	constructor(camera = new Camera(), element = document.createElement('')) {
+		const clipSpaceToWorld = new Vector4();
+
+		this.viewProjectionInverseSnapshot = new Matrix4();
+
+		this.applyIntersect = (
+			clientX = 0,
+			clientY = 0,
+			depth = 0,
+			dst = new Vector3(),
+		) => {
+			const rect = element.getBoundingClientRect();
+			// the code below could be simplified
+			// need to find the correct inverse-matrix to use to skip all the excessive math
+			// maybe just use projectionMatrix only
+			clipSpaceToWorld.x = 2 * ((clientX - rect.left) / rect.width - 0.5);
+			clipSpaceToWorld.y = -2 * ((clientY - rect.top) / rect.height - 0.5);
+			clipSpaceToWorld.z = depth;
+			clipSpaceToWorld.w = 1;
+
+			// no const, the matrix should be initialized once in the constructor
+			clipSpaceToWorld.applyMatrix4(this.viewProjectionInverseSnapshot);
+			clipSpaceToWorld.w = 1 / clipSpaceToWorld.w; // should be simplified to /=w
+			dst.x = clipSpaceToWorld.x * clipSpaceToWorld.w;
+			dst.y = clipSpaceToWorld.y * clipSpaceToWorld.w;
+			dst.z = clipSpaceToWorld.z * clipSpaceToWorld.w;
+		};
+
+		this.updateView = () => {
+			this.viewProjectionInverseSnapshot
+				.copy(camera.viewProjectionMatrix)
+				.inverse();
+		};
+
 		Object.defineProperties(this, {
-			camera: {value: camera},
-			element: {value: element},
-			screen: {value: new Vector2()},
-			clipSpaceToWorld: {value: new Vector4()},
-			viewProjectionInverseSnapshot: {value: new Matrix4()},
+			applyIntersect: {writable: false},
+			updateView: {writable: false},
+			viewProjectionInverseSnapshot: {writable: false},
 		});
-	}
-	applyIntersect(clientX = 0, clientY = 0, depth = 0, dst = new Vector3()) {
-		const rect = this.element.getBoundingClientRect();
-		// the code below could be simplified
-		// need to find the correct inverse-matrix to use to skip all the excessive math
-		// maybe just use projectionMatrix only
-		this.clipSpaceToWorld.x = 2 * ((clientX - rect.left) / rect.width - 0.5);
-		this.clipSpaceToWorld.y = -2 * ((clientY - rect.top) / rect.height - 0.5);
-		this.clipSpaceToWorld.z = depth;
-		this.clipSpaceToWorld.w = 1;
-
-		// no const, the matrix should be initialized once in the constructor
-		this.clipSpaceToWorld.applyMatrix4(this.viewProjectionInverseSnapshot);
-		this.clipSpaceToWorld.w = 1 / this.clipSpaceToWorld.w; // should be simplified to /=w
-		dst.x = this.clipSpaceToWorld.x * this.clipSpaceToWorld.w;
-		dst.y = this.clipSpaceToWorld.y * this.clipSpaceToWorld.w;
-		dst.z = this.clipSpaceToWorld.z * this.clipSpaceToWorld.w;
-	}
-
-	updateView() {
-		this.viewProjectionInverseSnapshot
-			.copy(this.camera.viewProjectionMatrix)
-			.inverse();
 	}
 }
 
