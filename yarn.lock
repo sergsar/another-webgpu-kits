@@ -300,10 +300,9 @@ ajv@^6.12.4:
     json-schema-traverse "^0.4.1"
     uri-js "^4.2.2"
 
-another-webgpu@^0.1.0-alpha.8:
-  version "0.1.0-alpha.8"
-  resolved "https://registry.yarnpkg.com/another-webgpu/-/another-webgpu-0.1.0-alpha.8.tgz#7c25831b35d0d5c034299bfc4727154f80f67f04"
-  integrity sha512-W89OJBoqy7K5EEaUweI7LcsxoqbMNXmqXKSpkD8zbxbynOwN3Y4lfLYFtP9cXqIgkiOLkQtJZe25R0CSSub9tA==
+"another-webgpu@link:../another-webgpu":
+  version "0.0.0"
+  uid ""
 
 ansi-regex@^5.0.1:
   version "5.0.1"
