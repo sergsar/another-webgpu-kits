@@ -1,6 +1,6 @@
 {
   "name": "another-webgpu-kits",
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.14",
   "description": "A set of kits for another-webgpu library",
   "type": "module",
   "main": "./build/another-webgpu-kits.cjs",
@@ -65,10 +65,10 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "another-webgpu": "^0.1.0-alpha.13",
+    "another-webgpu": "^0.1.0-alpha.14",
     "three": "^0.178.0"
   },
   "peerDependencies": {
-    "another-webgpu": ">=0.1.0-alpha.13"
+    "another-webgpu": ">=0.1.0-alpha.14"
   }
 }
