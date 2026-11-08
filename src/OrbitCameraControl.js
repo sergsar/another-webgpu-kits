@@ -5,8 +5,8 @@ import {
 	Ray,
 	UnitUtils,
 	Vector2,
-	Vector2Balancer,
 	Vector3,
+	RangeLimiter,
 } from 'another-webgpu';
 import {DepthHelper} from './DepthHelper.js';
 import {Projector} from './Projector.js';
@@ -31,17 +31,11 @@ class OrbitCameraControl {
 	}) {
 		const eventContext = {button: -1};
 
-		let thetaStart = 0;
-		let theta = thetaStart; // around y axis
+		let thetaDelta = 0; // around y axis
+		let phiDelta = 0; // around x axis
 		let phiStart = 0;
-		let phi = phiStart; // around x axis
-		let phiPrevious = phiStart;
 		let depthSnapshot = 0;
 		let zoomDelta = 0;
-		let pitch = 0;
-		let pitchStart = 0;
-		let distance = 0;
-		let overflow = false;
 		const depthLimit = 0.96;
 		const phiMinRad = UnitUtils.degToRad(phiMin);
 		const phiMaxRad = UnitUtils.degToRad(phiMax);
@@ -68,44 +62,23 @@ class OrbitCameraControl {
 		const intersectStart = new Vector3();
 		const intersect = new Vector3();
 		const cameraTravel = new Vector3();
-		const cameraTravelNormalized = new Vector3();
-		const cameraGroundPositionNormalized = new Vector3();
-		const cameraGroundPosition = new Vector3();
 		const zoomVector = new Vector3();
-		const distancingStart = new Vector3();
-		const distancingNormalized = new Vector3();
 		const cameraRay = new Ray();
 		const intersectPlane = new Plane(up);
 
-		const clientBalancer = new Vector2Balancer();
+		const phiLimiter = new RangeLimiter();
 		const depthHelper = new DepthHelper(camera, element);
 		const projector = new Projector(camera, element);
 
 		camera.useDepth = true;
-
-		const balancerCondition = () =>
-			(distance < 4 || eventContext.button === 0) &&
-			pitch > phiMinRad &&
-			pitch < phiMaxRad;
-		const balancerInversion = () =>
-			(eventContext.button === 2 &&
-				(cameraTravel.length < 0.1 ||
-					cameraTravelNormalized.dot(distancingNormalized) < 0.8)) ||
-			(eventContext.button === 0 &&
-				(Math.abs(phiPrevious) < 0.01 ||
-					(phi < phiPrevious && pitch < phiMaxRad) ||
-					(phi > phiPrevious && pitch > phiMinRad)));
-
-		clientBalancer.setCondition(balancerCondition);
-		clientBalancer.setInversion(balancerInversion);
 
 		const applyTransformations = () => {
 			cameraRotateVector.copy(cameraRotateVectorStart);
 			targetRotateVector.copy(targetRotateVectorStart);
 
 			quaternion.copy(directionQuaternion);
-			quaternion.rotateY(theta);
-			quaternion.rotateX(phi);
+			quaternion.rotateY(thetaDelta);
+			quaternion.rotateX(phiDelta);
 			quaternion.multiply(directionQuaternionConjugated);
 			cameraRotateVector.applyQuaternion(quaternion);
 			targetRotateVector.applyQuaternion(quaternion);
@@ -118,20 +91,12 @@ class OrbitCameraControl {
 				.copy(intersectStart)
 				.add(cameraTravel)
 				.add(targetRotateVector);
-
-			pitch = -(pitchStart + phi);
-			cameraGroundPosition.copy(camera.position).setY(0);
-			cameraGroundPositionNormalized.copy(cameraGroundPosition).normalize();
-
-			cameraTravelNormalized.copy(cameraTravel).normalize();
-			distancingNormalized.copy(distancingStart).add(cameraTravel);
-			distance = distancingNormalized.length;
-			distancingNormalized.normalize();
 		};
 
 		const applyIntersect = (clientX = 0, clientY = 0) => {
-			theta = thetaStart = 0;
-			phi = phiStart = phiPrevious = 0;
+			thetaDelta = 0;
+			phiDelta = 0;
+			phiLimiter.reset();
 
 			clientShift.set(0, 0);
 
@@ -144,7 +109,6 @@ class OrbitCameraControl {
 				.subtract(camera.position)
 				.normalize();
 			intersectPlane.distance = origin.y;
-			cameraRay.intersectPlane(intersectPlane, distancingStart);
 
 			depthSnapshot = depthHelper.getDepth(clientX, clientY);
 
@@ -190,7 +154,8 @@ class OrbitCameraControl {
 			targetRotateVectorStart.copy(camera.target).subtract(intersectStart);
 
 			cameraDirection.copy(camera.target).subtract(camera.position).normalize();
-			pitchStart = Math.asin(cameraDirection.y);
+			phiStart = Math.asin(cameraDirection.y);
+			phiLimiter.setRange(-phiStart - phiMaxRad, -phiStart - phiMinRad);
 			cameraYaw.copy(cameraDirection).setY(0).normalize();
 
 			directionQuaternion.setFromUnitVectors(forward, cameraYaw);
@@ -198,35 +163,23 @@ class OrbitCameraControl {
 		};
 
 		const reset = () => {
-			theta = thetaStart = 0;
-			phi = phiStart = phiPrevious = 0;
-			pitch = pitchStart = 0;
-			overflow = 0;
+			thetaDelta = 0;
+			phiDelta = 0;
+			phiStart = 0;
+			phiLimiter.reset();
 
 			cameraTravel.set(0, 0, 0);
-
-			clientBalancer.reset();
 		};
 
 		const onPointerMove = (e = new PointerEvent(null)) => {
-			if (overflow) {
-				return;
-			}
 			client.set(e.clientX, e.clientY).add(clientShift);
-			clientBalancer.setValue(client.x, client.y);
-			travel.copy(clientBalancer.balanced).subtract(clientStart);
+			travel.copy(client).subtract(clientStart);
 			if (eventContext.button === 0) {
-				theta = thetaStart - travel.x * 0.1;
-				phiPrevious = phi;
-				phi = phiStart - travel.y * 0.1;
+				thetaDelta = -travel.x * 0.1;
+				phiDelta = phiLimiter.apply(-travel.y * 0.1);
 			}
 			if (eventContext.button === 2) {
-				projector.unProjectFromSnapshot(
-					clientBalancer.balanced.x,
-					clientBalancer.balanced.y,
-					0,
-					intersect,
-				);
+				projector.unProjectFromSnapshot(client.x, client.y, 0, intersect);
 				cameraRay.direction
 					.copy(intersect)
 					.subtract(cameraRay.origin)
@@ -250,7 +203,10 @@ class OrbitCameraControl {
 
 		const onMouseWheel = (e = new WheelEvent(null)) => {
 			e.preventDefault();
-			if (camera.position.y > 20 && e.deltaY > 0 || camera.position.y < 5 && e.deltaY < 0) {
+			if (
+				(camera.position.y > 20 && e.deltaY > 0) ||
+				(camera.position.y < 5 && e.deltaY < 0)
+			) {
 				return;
 			}
 			zoomPositionUpdate.set(e.clientX, e.clientY).subtract(zoomPosition);
